@@ -1,0 +1,3 @@
+[submodule "Hista/Discord-Utils"]
+	path = Hista/Discord-Utils
+	url = https://github.com/Xwilarg/Discord-Utils
