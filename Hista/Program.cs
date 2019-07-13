@@ -40,7 +40,7 @@ namespace Hista
 
             client.MessageReceived += HandleCommandAsync;
             client.ReactionAdded += ReactionAdded;
-            client.ReactionAdded += ReactionRemoved;
+            client.ReactionRemoved += ReactionRemoved;
             client.Ready += Ready;
 
             await commands.AddModuleAsync<CommunicationModule>(null);
@@ -68,7 +68,7 @@ namespace Hista
                     Match match = Regex.Match(parts[0], "<:([^:]+):[0-9]{18}>>");
                     roles.Add(match.Success ? match.Groups[1].Value : parts[0], new Tuple<ulong, IRole>(ulong.Parse(parts[3]), client.GetGuild(ulong.Parse(parts[1])).GetRole(ulong.Parse(parts[4]))));
                     await ((IUserMessage)await client.GetGuild(ulong.Parse(parts[1])).GetTextChannel(ulong.Parse(parts[2])).GetMessageAsync(ulong.Parse(parts[3])))
-                        .AddReactionAsync(match.Success ? (IEmote)Emote.Parse(parts[0]) : new Emoji(parts[0]));
+                        .AddReactionAsync(match.Success ? (IEmote)Emote.Parse(parts[0]) : new Emoji(parts[0])); // Emote.Parse doesn't work ?
                 }
             }
         }
