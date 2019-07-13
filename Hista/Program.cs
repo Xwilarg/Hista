@@ -80,7 +80,7 @@ namespace Hista
                 var role = roles[reaction.Emote.Name];
                 if (msg.Id == role.Item1)
                 {
-                    IGuildUser author = (IGuildUser)(await msg.GetOrDownloadAsync()).Author;
+                    IGuildUser author = (IGuildUser)reaction.User.Value;
                     if (!author.RoleIds.Contains(role.Item2.Id))
                         await author.AddRoleAsync(role.Item2);
                 }
@@ -94,7 +94,7 @@ namespace Hista
                 var role = roles[reaction.Emote.Name];
                 if (msg.Id == role.Item1)
                 {
-                    IGuildUser author = (IGuildUser)(await msg.GetOrDownloadAsync()).Author;
+                    IGuildUser author = (IGuildUser)reaction.User.Value;
                     if (author.RoleIds.Contains(role.Item2.Id))
                         await author.RemoveRoleAsync(role.Item2);
                 }
