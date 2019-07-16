@@ -67,8 +67,11 @@ namespace Hista
                     string[] parts = line.Split(' ');
                     Match match = Regex.Match(parts[0], "<:([^:]+):[0-9]{18}>>");
                     roles.Add(match.Success ? match.Groups[1].Value : parts[0], new Tuple<ulong, IRole>(ulong.Parse(parts[3]), client.GetGuild(ulong.Parse(parts[1])).GetRole(ulong.Parse(parts[4]))));
-                    await ((IUserMessage)await client.GetGuild(ulong.Parse(parts[1])).GetTextChannel(ulong.Parse(parts[2])).GetMessageAsync(ulong.Parse(parts[3])))
-                        .AddReactionAsync(match.Success ? (IEmote)Emote.Parse(parts[0]) : new Emoji(parts[0])); // Emote.Parse doesn't work ?
+                    var msg = (IUserMessage)await client.GetGuild(ulong.Parse(parts[1])).GetTextChannel(ulong.Parse(parts[2])).GetMessageAsync(ulong.Parse(parts[3]));
+                    if (msg.Reactions.Any(x => x.Value.IsMe && x.Key.Name == parts[0]))
+                        ;
+                    else
+                        await msg.AddReactionAsync(match.Success ? (IEmote)Emote.Parse(parts[0]) : new Emoji(parts[0])); // TODO: Emote.Parse doesn't work ?
                 }
             }
         }
