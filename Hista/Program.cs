@@ -2,6 +2,7 @@
 using Discord.Commands;
 using Discord.WebSocket;
 using DiscordUtils;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -56,23 +57,21 @@ namespace Hista
 
         private async Task Ready()
         {
-            if (File.Exists("Keys/roles.txt"))
+            if (File.Exists("Keys/roles.json"))
             {
-                string[] lines = File.ReadAllLines("Keys/roles.txt");
-                foreach (string line in lines)
+                dynamic json = JsonConvert.DeserializeObject(File.ReadAllText("Keys/roles.json"));
+                foreach (dynamic elem in json.roles)
                 {
-                    if (line.StartsWith("//"))
-                        continue;
-                    // Emote name, Guild ID, Channel ID, Message ID, Role ID
-                    string[] parts = line.Split(' ');
-                    Match match = Regex.Match(parts[0], "<:([^:]+):[0-9]{18}>>");
-                    roles.Add(match.Success ? match.Groups[1].Value : parts[0], new Tuple<ulong, IRole>(ulong.Parse(parts[3]), client.GetGuild(ulong.Parse(parts[1])).GetRole(ulong.Parse(parts[4]))));
-                    var msg = (IUserMessage)await client.GetGuild(ulong.Parse(parts[1])).GetTextChannel(ulong.Parse(parts[2])).GetMessageAsync(ulong.Parse(parts[3]));
-                    if (msg.Reactions.Any(x => x.Value.IsMe && x.Key.Name == parts[0]))
-                        ;
-                    else
-                        await msg.AddReactionAsync(match.Success ? (IEmote)Emote.Parse(parts[0]) : new Emoji(parts[0])); // TODO: Emote.Parse doesn't work ?
+                    Match match = Regex.Match((string)elem.emote, "<:([^:]+):[0-9]{18}>>");
+                    roles.Add(match.Success ? match.Groups[1].Value : (string)elem.emote, new Tuple<ulong, IRole>((ulong)elem.messageId, client.GetGuild((ulong)elem.guildId).GetRole((ulong)elem.roleId)));
+                    var msg = (IUserMessage)await client.GetGuild((ulong)elem.guildId).GetTextChannel((ulong)elem.channelId).GetMessageAsync((ulong)elem.messageId);
+                    if (!msg.Reactions.Any(x => x.Value.IsMe && x.Key.Name == (string)elem.emote))
+                        await msg.AddReactionAsync(match.Success ? (IEmote)Emote.Parse((string)elem.emote) : new Emoji((string)elem.emote)); // TODO: Emote.Parse doesn't work ?
                 }
+            }
+            else if (File.Exists("Keys/factions.txt"))
+            {
+
             }
         }
 
