@@ -23,6 +23,9 @@ namespace Hista
         public DateTime StartTime { private set; get; }
         public static Program P { private set; get; }
         private Dictionary<string, Tuple<ulong, IRole>> roles;
+        private Dictionary<string, Tuple<ulong, IRole>> factions;
+        private Dictionary<ulong, IRole> defaultFactions;
+        private List<ulong> factionBlacklist;
 
         private Program()
         {
@@ -38,6 +41,9 @@ namespace Hista
         private async Task MainAsync()
         {
             roles = new Dictionary<string, Tuple<ulong, IRole>>();
+            factions = new Dictionary<string, Tuple<ulong, IRole>>();
+            defaultFactions = new Dictionary<ulong, IRole>();
+            factionBlacklist = new List<ulong>();
 
             client.MessageReceived += HandleCommandAsync;
             client.ReactionAdded += ReactionAdded;
@@ -65,14 +71,39 @@ namespace Hista
                     Match match = Regex.Match((string)elem.emote, "<:([^:]+):[0-9]{18}>>");
                     roles.Add(match.Success ? match.Groups[1].Value : (string)elem.emote, new Tuple<ulong, IRole>((ulong)elem.messageId, client.GetGuild((ulong)elem.guildId).GetRole((ulong)elem.roleId)));
                     var msg = (IUserMessage)await client.GetGuild((ulong)elem.guildId).GetTextChannel((ulong)elem.channelId).GetMessageAsync((ulong)elem.messageId);
-                    if (!msg.Reactions.Any(x => x.Value.IsMe && x.Key.Name == (string)elem.emote))
-                        await msg.AddReactionAsync(match.Success ? (IEmote)Emote.Parse((string)elem.emote) : new Emoji((string)elem.emote)); // TODO: Emote.Parse doesn't work ?
+                    await AddMissingReaction(msg, match.Success ? (IEmote)Emote.Parse((string)elem.emote) : new Emoji((string)elem.emote));
                 }
             }
-            else if (File.Exists("Keys/factions.txt"))
+            if (File.Exists("Keys/factions.json"))
             {
-
+                dynamic json = JsonConvert.DeserializeObject(File.ReadAllText("Keys/factions.json"));
+                foreach (ulong elem in json.blacklist)
+                {
+                    factionBlacklist.Add(elem);
+                }
+                foreach (dynamic elem in json.roles)
+                {
+                    Match match = Regex.Match((string)elem.emote, "<:([^:]+):[0-9]{18}>>");
+                    factions.Add(match.Success ? match.Groups[1].Value : (string)elem.emote, new Tuple<ulong, IRole>((ulong)elem.messageId, client.GetGuild((ulong)elem.guildId).GetRole((ulong)elem.roleId)));
+                    var msg = (IUserMessage)await client.GetGuild((ulong)elem.guildId).GetTextChannel((ulong)elem.channelId).GetMessageAsync((ulong)elem.messageId);
+                    await AddMissingReaction(msg, match.Success ? (IEmote)Emote.Parse((string)elem.emote) : new Emoji((string)elem.emote));
+                }
+                foreach (dynamic elem in json.defaultRole)
+                {
+                    IGuild guild = client.GetGuild((ulong)elem.guildId);
+                    IRole role = guild.GetRole((ulong)elem.roleId);
+                    defaultFactions.Add((ulong)elem.guildId, role);
+                    foreach (IGuildUser user in await guild.GetUsersAsync())
+                        if (!user.RoleIds.Contains(role.Id) && !user.RoleIds.Any(x => factions.Any(y => x == y.Value.Item2.Id)))
+                            await user.AddRoleAsync(role);
+                }
             }
+        }
+
+        private async Task AddMissingReaction(IUserMessage msg, IEmote emote)
+        {
+            if (!msg.Reactions.Any(x => x.Value.IsMe && x.Key.Name == emote.Name))
+                await msg.AddReactionAsync(emote); // TODO: Emote.Parse doesn't work ?
         }
 
         private async Task ReactionAdded(Cacheable<IUserMessage, ulong> msg, ISocketMessageChannel chan, SocketReaction reaction)
@@ -87,6 +118,40 @@ namespace Hista
                         await author.AddRoleAsync(role.Item2);
                 }
             }
+            if (factions.ContainsKey(reaction.Emote.Name))
+            {
+                var role = factions[reaction.Emote.Name];
+                if (msg.Id == role.Item1)
+                {
+                    if (factionBlacklist.Contains(reaction.UserId)) // We ignore blacklisted users
+                    {
+                        await (await msg.GetOrDownloadAsync()).RemoveReactionAsync(reaction.Emote, reaction.User.Value);
+                        return;
+                    }
+                    IGuildUser author = (IGuildUser)reaction.User.Value;
+                    foreach (var elem in factions) // If the user was already in another faction
+                    {
+                        if (elem.Key == reaction.Emote.Name)
+                            continue;
+                        var elemMsg = (IUserMessage)await chan.GetMessageAsync(elem.Value.Item1);
+                        KeyValuePair<IEmote, ReactionMetadata>? react = elemMsg.Reactions.FirstOrDefault(x => x.Value.IsMe && x.Key.Name == elem.Key);
+                        if (react != null)
+                        {
+                            await author.RemoveRoleAsync(elem.Value.Item2);
+                            await elemMsg.RemoveReactionAsync(react.Value.Key, reaction.User.Value);
+                            break;
+                        }
+                    }
+                    if (!author.RoleIds.Contains(role.Item2.Id))
+                        await author.AddRoleAsync(role.Item2);
+                    if (defaultFactions.ContainsKey(author.GuildId))
+                    {
+                        ulong id = defaultFactions[author.GuildId].Id;
+                        if (author.RoleIds.Any(x => x == id))
+                            await author.RemoveRoleAsync(defaultFactions[author.GuildId]);
+                    }
+                }
+            }
         }
 
         private async Task ReactionRemoved(Cacheable<IUserMessage, ulong> msg, ISocketMessageChannel chan, SocketReaction reaction)
@@ -99,6 +164,18 @@ namespace Hista
                     IGuildUser author = (IGuildUser)reaction.User.Value;
                     if (author.RoleIds.Contains(role.Item2.Id))
                         await author.RemoveRoleAsync(role.Item2);
+                }
+            }
+            if (factions.ContainsKey(reaction.Emote.Name))
+            {
+                var role = factions[reaction.Emote.Name];
+                if (msg.Id == role.Item1)
+                {
+                    IGuildUser author = (IGuildUser)reaction.User.Value;
+                    if (author.RoleIds.Contains(role.Item2.Id))
+                        await author.RemoveRoleAsync(role.Item2);
+                    if (defaultFactions.ContainsKey(author.GuildId))
+                        await author.AddRoleAsync(defaultFactions[author.GuildId]);
                 }
             }
         }
