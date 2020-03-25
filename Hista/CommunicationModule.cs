@@ -11,5 +11,11 @@ namespace Hista
         {
             await ReplyAsync("", false, Utils.GetBotInfo(Program.P.StartTime, "Hista", Program.P.client.CurrentUser));
         }
+
+        [Command("Help")]
+        public async Task Help()
+        {
+            await ReplyAsync("There is nothing I'm willing to do to help you.");
+        }
     }
 }
