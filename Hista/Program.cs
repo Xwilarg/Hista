@@ -25,7 +25,10 @@ namespace Hista
         private Dictionary<string, Tuple<ulong, IRole>> roles;
         private Dictionary<string, Tuple<ulong, IRole>> factions;
         private Dictionary<ulong, IRole> defaultFactions;
+        private Dictionary<ulong, IRole> speakingRole;
         private List<ulong> factionBlacklist;
+
+        private Db.Db botDb;
 
         private Program()
         {
@@ -40,10 +43,14 @@ namespace Hista
 
         private async Task MainAsync()
         {
+            botDb = new Db.Db();
+            await botDb.InitAsync();
+
             roles = new Dictionary<string, Tuple<ulong, IRole>>();
             factions = new Dictionary<string, Tuple<ulong, IRole>>();
             defaultFactions = new Dictionary<ulong, IRole>();
             factionBlacklist = new List<ulong>();
+            speakingRole = new Dictionary<ulong, IRole>();
 
             client.MessageReceived += HandleCommandAsync;
             client.ReactionAdded += ReactionAdded;
@@ -98,6 +105,23 @@ namespace Hista
                             await user.AddRoleAsync(role);
                 }
             }
+            if (File.Exists("Keys/active.json"))
+            {
+                dynamic json = JsonConvert.DeserializeObject(File.ReadAllText("Keys/active.json"));
+                foreach (dynamic elem in json.roles)
+                {
+                    IGuild guild = client.GetGuild((ulong)elem.guildId);
+                    speakingRole.Add(guild.Id, guild.GetRole((ulong)elem.roleId));
+                }
+            }
+            _ = Task.Run(async () =>
+            {
+                foreach (var elem in speakingRole)
+                {
+                    await botDb.RemoveRoles(client.GetGuild(elem.Key), elem.Value);
+                }
+                await Task.Delay(3600000); // 1 hour
+            });
         }
 
         private async Task AddMissingReaction(IUserMessage msg, IEmote emote)
@@ -190,6 +214,9 @@ namespace Hista
                 SocketCommandContext context = new SocketCommandContext(client, msg);
                 await commands.ExecuteAsync(context, pos, null);
             }
+            ITextChannel chan = msg.Channel as ITextChannel;
+            if (chan != null && speakingRole.ContainsKey(chan.GuildId))
+                await botDb.UpdateUser((IGuildUser)msg.Author, DateTime.Now, speakingRole[chan.GuildId]);
         }
     }
 }
