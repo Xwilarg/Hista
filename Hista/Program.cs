@@ -207,12 +207,15 @@ namespace Hista
         private async Task HandleCommandAsync(SocketMessage arg)
         {
             SocketUserMessage msg = arg as SocketUserMessage;
-            if (msg == null || arg.Author.IsBot) return;
-            int pos = 0;
-            if (msg.HasMentionPrefix(client.CurrentUser, ref pos) || msg.HasStringPrefix("h.", ref pos))
+            if (msg == null) return;
+            if (!arg.Author.IsBot)
             {
-                SocketCommandContext context = new SocketCommandContext(client, msg);
-                await commands.ExecuteAsync(context, pos, null);
+                int pos = 0;
+                if (msg.HasMentionPrefix(client.CurrentUser, ref pos) || msg.HasStringPrefix("h.", ref pos))
+                {
+                    SocketCommandContext context = new SocketCommandContext(client, msg);
+                    await commands.ExecuteAsync(context, pos, null);
+                }
             }
             ITextChannel chan = msg.Channel as ITextChannel;
             if (chan != null && speakingRole.ContainsKey(chan.GuildId))
