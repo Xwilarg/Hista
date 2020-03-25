@@ -35,7 +35,7 @@ namespace Hista.Db
             var now = DateTime.Now;
             foreach (var elem in lastSpoke)
             {
-                if ((int)now.Subtract(elem.Value).TotalDays >= 7)
+                if ((int)now.Subtract(elem.Value).TotalDays >= 3)
                 {
                     await (await guild.GetUserAsync(elem.Key)).RemoveRoleAsync(role);
                     await R.Db(dbName).Table("Users").Filter(R.HashMap("id", elem.Key.ToString())).Delete().RunAsync(conn);
