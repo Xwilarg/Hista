@@ -32,6 +32,7 @@ namespace Hista.Db
 
         public async Task RemoveRoles(IGuild guild, IRole role) // TODO: Manage many guilds
         {
+            iterate:
             var now = DateTime.Now;
             foreach (var elem in lastSpoke)
             {
@@ -40,6 +41,7 @@ namespace Hista.Db
                     await (await guild.GetUserAsync(elem.Key)).RemoveRoleAsync(role);
                     await R.Db(dbName).Table("Users").Filter(R.HashMap("id", elem.Key.ToString())).Delete().RunAsync(conn);
                     lastSpoke.Remove(elem.Key);
+                    goto iterate;
                 }
             }
         }
